@@ -1,0 +1,5 @@
+.DS_Store
+baseline.conf
+test/work/
+*.generated.*
+!samples/*.generated.*

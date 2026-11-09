@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SOC 資料去識別化工具</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f0f2f5; color: #1a1a2e; min-height: 100vh; }
+
+  header { background: #1a1a2e; color: #fff; padding: 20px 32px; display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 18px; font-weight: 600; }
+  header span { font-size: 12px; background: #e63946; padding: 2px 8px; border-radius: 4px; letter-spacing: 0.5px; }
+
+  .container { max-width: 960px; margin: 32px auto; padding: 0 20px; }
+
+  .tabs { display: flex; gap: 0; margin-bottom: 24px; border-radius: 8px; overflow: hidden; border: 1px solid #dde1e9; background: #fff; }
+  .tab { flex: 1; padding: 14px; text-align: center; cursor: pointer; font-size: 14px; font-weight: 500; color: #666; transition: all .2s; border: none; background: none; }
+  .tab.active { background: #1a1a2e; color: #fff; }
+  .tab:hover:not(.active) { background: #f8f9fc; }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .card { background: #fff; border-radius: 12px; padding: 28px; border: 1px solid #dde1e9; margin-bottom: 20px; }
+  .card h2 { font-size: 15px; font-weight: 600; margin-bottom: 6px; color: #1a1a2e; }
+  .card p { font-size: 13px; color: #666; margin-bottom: 20px; line-height: 1.6; }
+
+  .upload-zone { border: 2px dashed #c8d0e0; border-radius: 8px; padding: 40px 20px; text-align: center; cursor: pointer; transition: all .2s; position: relative; }
+  .upload-zone:hover, .upload-zone.drag { border-color: #3a86ff; background: #f0f5ff; }
+  .upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+  .upload-zone .icon { font-size: 36px; margin-bottom: 12px; }
+  .upload-zone .hint { font-size: 13px; color: #888; }
+  .upload-zone .filename { font-size: 14px; font-weight: 600; color: #3a86ff; margin-top: 8px; }
+
+  .fields-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-bottom: 20px; }
+  .field-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #f8f9fc; border-radius: 6px; border: 1px solid #e8ebf0; font-size: 13px; }
+  .field-item input[type=checkbox] { accent-color: #e63946; }
+  .field-tag { font-size: 11px; background: #fff0f0; color: #e63946; padding: 2px 6px; border-radius: 4px; margin-left: auto; font-family: monospace; }
+
+  .btn { padding: 12px 28px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all .2s; }
+  .btn-primary { background: #1a1a2e; color: #fff; }
+  .btn-primary:hover { background: #2d2d4e; }
+  .btn-danger { background: #e63946; color: #fff; }
+  .btn-danger:hover { background: #c1121f; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-group { display: flex; gap: 12px; flex-wrap: wrap; }
+
+  .status { padding: 14px 18px; border-radius: 8px; font-size: 13px; margin-top: 16px; display: none; }
+  .status.info { background: #e8f4fd; color: #1565c0; border: 1px solid #bbdefb; }
+  .status.success { background: #e8f5e9; color: #1b5e20; border: 1px solid #c8e6c9; }
+  .status.error { background: #ffebee; color: #b71c1c; border: 1px solid #ffcdd2; }
+
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 20px 0; }
+  .stat { background: #f8f9fc; border-radius: 8px; padding: 16px; text-align: center; border: 1px solid #e8ebf0; }
+  .stat .num { font-size: 26px; font-weight: 700; color: #1a1a2e; }
+  .stat .label { font-size: 12px; color: #888; margin-top: 4px; }
+
+  .progress { height: 6px; background: #e8ebf0; border-radius: 3px; overflow: hidden; margin: 12px 0; display: none; }
+  .progress-bar { height: 100%; background: #3a86ff; border-radius: 3px; transition: width .3s; }
+
+  .mapping-preview { font-family: monospace; font-size: 12px; background: #f8f9fc; border: 1px solid #e8ebf0; border-radius: 6px; padding: 14px; max-height: 180px; overflow-y: auto; margin: 12px 0; }
+
+  .step { display: flex; gap: 14px; margin-bottom: 18px; align-items: flex-start; }
+  .step-num { width: 28px; height: 28px; min-width: 28px; background: #1a1a2e; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; }
+  .step-body { flex: 1; }
+  .step-body h3 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .step-body p { font-size: 13px; color: #666; line-height: 1.5; }
+
+  @media (max-width: 600px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .fields-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>🔒</div>
+  <h1>SOC 資料去識別化工具</h1>
+  <span>OFFLINE</span>
+</header>
+
+<div class="container">
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('deidentify')">① 去識別化</button>
+    <button class="tab" onclick="switchTab('restore')">② 還原</button>
+    <button class="tab" onclick="switchTab('howto')">使用說明</button>
+  </div>
+
+  <!-- ① 去識別化 -->
+  <div id="panel-deidentify" class="panel active">
+    <div class="card">
+      <h2>上傳 SOC 通報 CSV</h2>
+      <p>選擇要去識別化的 CSV 檔案。所有資料處理皆在本機瀏覽器完成，不會上傳至任何伺服器。</p>
+      <div class="upload-zone" id="uploadZone1">
+        <input type="file" id="csvInput" accept=".csv" onchange="handleCSV(this)">
+        <div class="icon">📂</div>
+        <div class="hint">點擊選擇或拖放 CSV 檔案</div>
+        <div class="filename" id="csvFilename"></div>
+      </div>
+    </div>
+
+    <div class="card" id="fieldCard" style="display:none">
+      <h2>選擇要去識別化的欄位</h2>
+      <p>已預設勾選偵測到的敏感欄位，也可手動調整。Description 欄位會同時掃描並替換其中嵌入的 IP 和主機名稱。</p>
+      <div class="fields-grid" id="fieldsGrid"></div>
+
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:16px;cursor:pointer;">
+        <input type="checkbox" id="scanDesc" checked style="accent-color:#e63946">
+        同時掃描 Description / Summary 欄位中嵌入的 IP 與主機名稱
+      </label>
+
+      <div class="btn-group">
+        <button class="btn btn-danger" id="btnAnon" onclick="anonymize()">開始去識別化</button>
+      </div>
+
+      <div class="progress" id="progress1"><div class="progress-bar" id="progressBar1"></div></div>
+      <div class="status" id="status1"></div>
+
+      <div id="statsDiv" style="display:none">
+        <div class="stats" id="statsGrid"></div>
+        <div class="mapping-preview" id="mappingPreview"></div>
+        <div class="btn-group" style="margin-top:8px">
+          <button class="btn btn-primary" onclick="downloadAnon()">⬇ 下載去識別化 CSV</button>
+          <button class="btn btn-primary" onclick="downloadMapping()">⬇ 下載 mapping.json（還原用）</button>
+        </div>
+
+        <div style="margin-top:20px;padding-top:20px;border-top:1px solid #e8ebf0">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <span style="font-size:14px;font-weight:600;color:#1a1a2e">📋 AI 分析 Prompt（可貼到 ChatGPT / Claude）</span>
+            <button class="btn btn-primary" style="padding:6px 16px;font-size:12px" onclick="copyPrompt()">複製 Prompt</button>
+          </div>
+          <textarea id="aiPrompt" readonly
+            style="width:100%;height:160px;padding:12px;font-size:12px;font-family:monospace;border:1px solid #dde1e9;border-radius:8px;resize:vertical;background:#f8f9fc;color:#444;line-height:1.6"></textarea>
+          <p style="font-size:11px;color:#888;margin-top:6px">⚠️ 請將「去識別化 CSV」的內容附在此 Prompt 後方，一起貼給 AI。AI 回傳的報告請貼到「② 還原 → 貼上文字」進行還原。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ② 還原 -->
+  <div id="panel-restore" class="panel">
+    <div class="card">
+      <h2>上傳 mapping.json</h2>
+      <p>上傳 AI 分析前下載的 mapping.json 對照表。</p>
+      <div class="upload-zone" id="uploadZone2">
+        <input type="file" id="mappingInput" accept=".json" onchange="handleMapping(this)">
+        <div class="icon">🗂</div>
+        <div class="hint">點擊選擇 mapping.json</div>
+        <div class="filename" id="mappingFilename"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>AI 分析結果</h2>
+      <p>選擇輸入方式：</p>
+      <div style="display:flex;gap:0;border-radius:6px;overflow:hidden;border:1px solid #dde1e9;margin-bottom:16px;width:fit-content">
+        <button id="modeCSV" class="tab active" style="flex:none;padding:8px 20px;font-size:13px" onclick="setRestoreMode('csv')">📊 上傳 CSV</button>
+        <button id="modeTXT" class="tab" style="flex:none;padding:8px 20px;font-size:13px" onclick="setRestoreMode('text')">📝 貼上文字</button>
+      </div>
+
+      <div id="restoreModeCSV">
+        <div class="upload-zone">
+          <input type="file" id="resultInput" accept=".csv" onchange="handleResult(this)">
+          <div class="icon">📊</div>
+          <div class="hint">點擊選擇 AI 分析結果 CSV</div>
+          <div class="filename" id="resultFilename"></div>
+        </div>
+      </div>
+
+      <div id="restoreModeTXT" style="display:none">
+        <textarea id="pasteInput" placeholder="將 AI 分析結果貼在這裡（文字、Markdown、HTML 都可以）..."
+          oninput="checkRestoreReady()"
+          style="width:100%;height:200px;padding:12px;font-size:13px;font-family:monospace;border:1px solid #dde1e9;border-radius:8px;resize:vertical;outline:none;line-height:1.6"></textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <button class="btn btn-primary" id="btnRestore" onclick="restore()" disabled>開始還原</button>
+      <div class="status" id="status2"></div>
+      <div id="restoreDownload" style="display:none;margin-top:14px">
+        <div class="btn-group" id="restoreBtns"></div>
+        <div id="textResult" style="display:none;margin-top:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <span style="font-size:13px;font-weight:600;color:#1a1a2e">還原結果</span>
+            <button class="btn btn-primary" style="padding:6px 16px;font-size:12px" onclick="copyResult()">複製</button>
+          </div>
+          <div id="textResultContent" style="font-family:monospace;font-size:12px;background:#f8f9fc;border:1px solid #e8ebf0;border-radius:6px;padding:14px;max-height:300px;overflow-y:auto;white-space:pre-wrap;line-height:1.6"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 使用說明 -->
+  <div id="panel-howto" class="panel">
+    <div class="card">
+      <h2>標準流程</h2>
+      <p>此工具讓您安全地把 SOC 通報資料送給 AI 分析，資料全程不離開您的電腦。</p>
+      <br>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h3>去識別化</h3>
+          <p>在「去識別化」頁面上傳 SOC CSV，勾選要遮蔽的欄位，下載<strong>去識別化 CSV</strong> 和 <strong>mapping.json</strong>。</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h3>送 AI 分析</h3>
+          <p>將去識別化 CSV 貼給 AI（ChatGPT / Claude 等），讓 AI 進行分析。IP 和主機名稱已替換為 [IP_001] 等 token，不含真實資訊。</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h3>還原</h3>
+          <p>在「還原」頁面上傳 mapping.json 和 AI 分析結果 CSV，點還原，即可得到含真實資訊的完整報告。</p>
+        </div>
+      </div>
+      <br>
+      <p style="font-size:12px;color:#888;">⚠️ mapping.json 是還原的唯一依據，請妥善保管，勿外傳。</p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── 敏感欄位設定 ──
+const SENSITIVE_COLS = {
+  '專案名稱':   { prefix: 'CLIENT', label: '[CLIENT]' },
+  'OID':        { prefix: 'OID',    label: '[OID]' },
+  'Case ID':    { prefix: 'CASE',   label: '[CASE]' },
+  '攻擊來源IP': { prefix: 'IP',     label: '[IP]' },
+  '攻擊主機名稱':{ prefix: 'HOST',  label: '[HOST]' },
+  '攻擊來源User':{ prefix: 'USER',  label: '[USER]' },
+  '目標主機IP': { prefix: 'IP',     label: '[IP]' },
+  '目標主機名稱':{ prefix: 'HOST',  label: '[HOST]' },
+  '目標主機User':{ prefix: 'USER',  label: '[USER]' },
+  '設備IP':     { prefix: 'IP',     label: '[IP]' },
+  '設備主機名稱':{ prefix: 'HOST',  label: '[HOST]' },
+  '客戶處理':   { prefix: 'NOTE',   label: '[NOTE]' },
+  '發送群組':   { prefix: 'GROUP',  label: '[GROUP]' },
+};
+
+const TEXT_SCAN_COLS = ['Description', 'Summary', '客戶處理'];
+
+// ── 狀態 ──
+let parsedRows = [], headers = [], anonRows = [], mapping = {}, restoredRows = [], loadedMapping = {};
+
+// ── CSV 解析（支援帶換行的欄位）──
+function parseCSV(text) {
+  const lines = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i], n = text[i+1];
+    if (c === '"') { if (inQ && n === '"') { cur += '"'; i++; } else inQ = !inQ; }
+    else if (c === '\n' && !inQ) { lines.push(cur); cur = ''; }
+    else if (c === '\r' && n === '\n' && !inQ) { lines.push(cur); cur = ''; i++; }
+    else cur += c;
+  }
+  if (cur) lines.push(cur);
+
+  function splitRow(line) {
+    const fields = []; let f = '', inq = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i], n = line[i+1];
+      if (c === '"') { if (inq && n === '"') { f += '"'; i++; } else inq = !inq; }
+      else if (c === ',' && !inq) { fields.push(f); f = ''; }
+      else f += c;
+    }
+    fields.push(f);
+    return fields;
+  }
+
+  const hdr = splitRow(lines[0]);
+  const rows = lines.slice(1).filter(l => l.trim()).map(l => {
+    const vals = splitRow(l);
+    const obj = {};
+    hdr.forEach((h, i) => obj[h] = (vals[i] || '').trim());
+    return obj;
+  });
+  return { headers: hdr, rows };
+}
+
+function toCSV(hdr, rows) {
+  const esc = v => (v.includes(',') || v.includes('"') || v.includes('\n')) ? `"${v.replace(/"/g,'""')}"` : v;
+  return [hdr.map(esc).join(','), ...rows.map(r => hdr.map(h => esc(r[h] || '')).join(','))].join('\r\n');
+}
+
+// ── 載入 CSV ──
+function handleCSV(input) {
+  const file = input.files[0]; if (!file) return;
+  document.getElementById('csvFilename').textContent = '✓ ' + file.name;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const text = e.target.result.replace(/^﻿/, '');
+    const parsed = parseCSV(text);
+    headers = parsed.headers; parsedRows = parsed.rows;
+    renderFields();
+    document.getElementById('fieldCard').style.display = '';
+    showStatus('status1', `✓ 已載入 ${parsedRows.length.toLocaleString()} 筆資料，共 ${headers.length} 個欄位`, 'info');
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function renderFields() {
+  const grid = document.getElementById('fieldsGrid'); grid.innerHTML = '';
+  headers.forEach(h => {
+    const def = SENSITIVE_COLS[h];
+    const div = document.createElement('div'); div.className = 'field-item';
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.id = 'f_' + h; cb.value = h;
+    if (def) cb.checked = true;
+    const lbl = document.createElement('label'); lbl.htmlFor = 'f_' + h; lbl.textContent = h; lbl.style.cursor = 'pointer'; lbl.style.flex = '1';
+    div.appendChild(cb); div.appendChild(lbl);
+    if (def) { const tag = document.createElement('span'); tag.className = 'field-tag'; tag.textContent = def.label; div.appendChild(tag); }
+    grid.appendChild(div);
+  });
+}
+
+// ── 去識別化 ──
+function getToken(val, prefix, map, counters) {
+  if (!val || !val.trim()) return val;
+  if (map[val]) return map[val];
+  const n = (counters[prefix] = (counters[prefix] || 0) + 1);
+  const token = `[${prefix}_${String(n).padStart(3,'0')}]`;
+  map[val] = token;
+  return token;
+}
+
+const IP_RE = /\b(\d{1,3}\.){3}\d{1,3}\b/g;
+
+function anonymize() {
+  const selected = [...document.querySelectorAll('#fieldsGrid input[type=checkbox]:checked')].map(c => c.value);
+  if (!selected.length) { showStatus('status1', '請至少勾選一個欄位', 'error'); return; }
+
+  mapping = {}; const counters = {};
+  const scanDesc = document.getElementById('scanDesc').checked;
+  const prog = document.getElementById('progress1'); prog.style.display = '';
+  const bar = document.getElementById('progressBar1');
+
+  anonRows = parsedRows.map((row, i) => {
+    bar.style.width = ((i / parsedRows.length) * 100) + '%';
+    const r = { ...row };
+
+    selected.forEach(col => {
+      const val = r[col];
+      if (!val) return;
+      const prefix = (SENSITIVE_COLS[col] && SENSITIVE_COLS[col].prefix) || 'FIELD';
+      r[col] = getToken(val, prefix, mapping, counters);
+    });
+
+    if (scanDesc) {
+      TEXT_SCAN_COLS.forEach(col => {
+        if (!r[col]) return;
+        // Replace IPs
+        r[col] = r[col].replace(IP_RE, ip => getToken(ip, 'IP', mapping, counters));
+        // Replace known hostnames from mapping values (reverse lookup)
+        Object.keys(mapping).forEach(orig => {
+          if (orig && !/^\d{1,3}(\.\d{1,3}){3}$/.test(orig)) {
+            r[col] = r[col].split(orig).join(mapping[orig]);
+          }
+        });
+      });
+    }
+
+    return r;
+  });
+
+  bar.style.width = '100%';
+  setTimeout(() => { prog.style.display = 'none'; }, 500);
+
+  const tokenCount = Object.keys(mapping).length;
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="stat"><div class="num">${parsedRows.length.toLocaleString()}</div><div class="label">總筆數</div></div>
+    <div class="stat"><div class="num">${selected.length}</div><div class="label">處理欄位數</div></div>
+    <div class="stat"><div class="num">${tokenCount}</div><div class="label">替換 token 數</div></div>
+    <div class="stat"><div class="num">${Object.values(mapping).filter(v=>v.startsWith('[IP')).length}</div><div class="label">IP token 數</div></div>
+  `;
+
+  const previewEntries = Object.entries(mapping).slice(0, 15).map(([k,v]) => `  "${k}" → "${v}"`).join('\n');
+  document.getElementById('mappingPreview').textContent =
+    `// Mapping 預覽（前 15 筆，共 ${tokenCount} 筆）\n{\n${previewEntries}\n  ...\n}`;
+
+  document.getElementById('statsDiv').style.display = '';
+  document.getElementById('aiPrompt').value = generatePrompt({ total: parsedRows.length });
+  showStatus('status1', `✅ 去識別化完成！替換 ${tokenCount} 個唯一值，請下載兩個檔案。`, 'success');
+}
+
+function generatePrompt(stats) {
+  return `以下是一份已去識別化的 SOC 資安通報資料（共 ${stats.total} 筆），其中敏感資訊（IP 位址、主機名稱、客戶名稱等）已替換為代碼（如 [IP_001]、[HOST_002]、[CLIENT_001]）。
+
+請協助進行以下分析：
+
+1. **攻擊態勢摘要**：本批次資料中最主要的攻擊類型、手法與趨勢
+2. **高風險事件識別**：列出需要優先處理的事件，說明原因
+3. **攻擊來源分析**：高頻攻擊來源（代碼）的行為模式
+4. **目標分析**：最常被攻擊的目標主機/IP（代碼）及可能原因
+5. **MITRE ATT&CK 對應**：本批次涉及的主要戰術與技術
+6. **建議處置方向**：針對本批次通報的具體改善建議
+
+分析時請保留代碼格式（如 [IP_001]），不需要猜測真實值。報告請以繁體中文呈現，結構清晰。
+
+--- 以下是去識別化後的資料 ---`;
+}
+
+function copyPrompt() {
+  const txt = document.getElementById('aiPrompt').value;
+  navigator.clipboard.writeText(txt).then(() => {
+    const btn = event.target; btn.textContent = '已複製！';
+    setTimeout(() => btn.textContent = '複製 Prompt', 1500);
+  });
+}
+
+function downloadAnon() {
+  download(toCSV(headers, anonRows), 'soc-anonymized.csv', 'text/csv;charset=utf-8');
+}
+
+function downloadMapping() {
+  const ts = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+  download(JSON.stringify({ created: ts, count: Object.keys(mapping).length, mapping }, null, 2),
+    `soc-mapping-${ts}.json`, 'application/json');
+}
+
+// ── 還原 ──
+let restoreMode = 'csv';
+
+function setRestoreMode(mode) {
+  restoreMode = mode;
+  document.getElementById('modeCSV').classList.toggle('active', mode === 'csv');
+  document.getElementById('modeTXT').classList.toggle('active', mode === 'text');
+  document.getElementById('restoreModeCSV').style.display = mode === 'csv' ? '' : 'none';
+  document.getElementById('restoreModeTXT').style.display = mode === 'text' ? '' : 'none';
+  checkRestoreReady();
+}
+
+function handleMapping(input) {
+  const file = input.files[0]; if (!file) return;
+  document.getElementById('mappingFilename').textContent = '✓ ' + file.name;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      loadedMapping = parsed.mapping || parsed;
+      showStatus('status2', `✓ mapping 載入成功，共 ${Object.keys(loadedMapping).length} 個對照項目`, 'info');
+      checkRestoreReady();
+    } catch { showStatus('status2', '❌ mapping.json 格式錯誤', 'error'); }
+  };
+  reader.readAsText(file);
+}
+
+function handleResult(input) {
+  const file = input.files[0]; if (!file) return;
+  document.getElementById('resultFilename').textContent = '✓ ' + file.name;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const text = e.target.result.replace(/^﻿/, '');
+    const parsed = parseCSV(text);
+    restoredRows = parsed.rows;
+    window._resultHeaders = parsed.headers;
+    checkRestoreReady();
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function checkRestoreReady() {
+  const hasMapping = Object.keys(loadedMapping).length > 0;
+  const hasData = restoreMode === 'csv'
+    ? restoredRows.length > 0
+    : document.getElementById('pasteInput').value.trim().length > 0;
+  document.getElementById('btnRestore').disabled = !(hasMapping && hasData);
+}
+
+function buildReverseRegex() {
+  const reverseMap = {};
+  Object.entries(loadedMapping).forEach(([orig, token]) => reverseMap[token] = orig);
+  const escaped = Object.keys(reverseMap).map(t => t.replace(/[[\](){}.*+?^$|\\]/g, '\\$&'));
+  if (!escaped.length) return null;
+  return { re: new RegExp(escaped.join('|'), 'g'), map: reverseMap };
+}
+
+function restore() {
+  const rv = buildReverseRegex();
+  if (!rv) { showStatus('status2', '❌ mapping 是空的', 'error'); return; }
+  const { re, map } = rv;
+
+  if (restoreMode === 'csv') {
+    const out = restoredRows.map(row => {
+      const r = { ...row };
+      Object.keys(r).forEach(col => { if (r[col]) r[col] = r[col].replace(re, m => map[m] ?? m); });
+      return r;
+    });
+    window._restoredResult = out;
+    const btns = document.getElementById('restoreBtns');
+    btns.innerHTML = '<button class="btn btn-danger" onclick="downloadRestored()">⬇ 下載還原後 CSV</button>';
+    document.getElementById('textResult').style.display = 'none';
+    document.getElementById('restoreDownload').style.display = '';
+    showStatus('status2', `✅ 還原完成，${out.length} 筆資料已還原`, 'success');
+
+  } else {
+    const input = document.getElementById('pasteInput').value;
+    const restored = input.replace(re, m => map[m] ?? m);
+    window._restoredText = restored;
+    document.getElementById('textResultContent').textContent = restored;
+    document.getElementById('textResult').style.display = '';
+    const btns = document.getElementById('restoreBtns');
+    btns.innerHTML = '<button class="btn btn-danger" onclick="downloadRestoredText()">⬇ 下載還原後文字檔</button>';
+    document.getElementById('restoreDownload').style.display = '';
+    showStatus('status2', `✅ 還原完成`, 'success');
+  }
+}
+
+function copyResult() {
+  navigator.clipboard.writeText(window._restoredText || '').then(() => {
+    const btn = event.target; btn.textContent = '已複製！';
+    setTimeout(() => btn.textContent = '複製', 1500);
+  });
+}
+
+function downloadRestored() {
+  download(toCSV(window._resultHeaders, window._restoredResult), 'soc-restored.csv', 'text/csv;charset=utf-8');
+}
+
+function downloadRestoredText() {
+  download(window._restoredText || '', 'soc-analysis-restored.txt', 'text/plain;charset=utf-8');
+}
+
+// ── 工具 ──
+function download(content, filename, mime) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + content], { type: mime }));
+  a.download = filename; a.click();
+}
+
+function showStatus(id, msg, type) {
+  const el = document.getElementById(id);
+  el.className = 'status ' + type; el.textContent = msg; el.style.display = '';
+}
+
+function switchTab(id) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    const ids = ['deidentify','restore','howto'];
+    t.classList.toggle('active', ids[i] === id);
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + id).classList.add('active');
+}
+
+// Drag & drop
+const dropZones = [
+  { id: 'uploadZone1', inputId: 'csvInput',     handler: el => handleCSV(el) },
+  { id: 'uploadZone2', inputId: 'mappingInput', handler: el => handleMapping(el) },
+];
+dropZones.forEach(({ id, inputId, handler }) => {
+  const z = document.getElementById(id); if (!z) return;
+  z.addEventListener('dragover', e => { e.preventDefault(); z.classList.add('drag'); });
+  z.addEventListener('dragleave', e => { if (!z.contains(e.relatedTarget)) z.classList.remove('drag'); });
+  z.addEventListener('drop', e => {
+    e.preventDefault(); z.classList.remove('drag');
+    const file = e.dataTransfer.files[0]; if (!file) return;
+    const input = document.getElementById(inputId);
+    const dt = new DataTransfer(); dt.items.add(file);
+    input.files = dt.files;
+    handler(input);
+  });
+});
+</script>
+</body>
+</html>
